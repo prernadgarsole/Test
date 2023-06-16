@@ -1,0 +1,54 @@
+from flask import Flask, request
+import requests
+
+app = Flask(__name__)
+
+@app.route('/webhook', methods=['POST'])
+def handle_webhook():
+    # Process the webhook payload here
+    payload = request.json
+    # Implement your logic based on the received payload
+    
+    return 'Webhook received!', 200
+
+def create_webhook():
+    # Set your GitHub access token and repository details
+    access_token = 'your_access_token'
+    owner = 'your_username'
+    repo = 'your_repository'
+    webhook_url = 'http://your-server.com/webhook'
+
+    # API endpoint for creating a webhook
+    url = f'https://api.github.com/repos/{owner}/{repo}/hooks'
+
+    # Request headers
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Accept': 'application/vnd.github.v3+json'
+    }
+
+    # Request payload for creating the webhook
+    payload = {
+        'name': 'web',
+        'active': True,
+        'events': ['push'],
+        'config': {
+            'url': webhook_url,
+            'content_type': 'json'
+        }
+    }
+
+    # Send the POST request to create the webhook
+    response = requests.post(url, headers=headers, json=payload)
+
+    # Check the response status
+    if response.status_code == 201:
+        print('Webhook created successfully.')
+    else:
+        print('Failed to create the webhook.')
+        print(response.text)
+
+if __name__ == '__main__':
+    create_webhook()
+    app.run(host='0.0.0.0', port=5000)
+
