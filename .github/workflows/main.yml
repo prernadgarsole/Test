@@ -5,12 +5,9 @@ on:
     branches:
       - Test
 jobs:
-  Checkout:
-    # ...
-    # Add your existing checkout job configuration here
-    # ...
+
   PublishUCD:
-    needs: Checkout
+    #needs: Checkout
     if: github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'Test'
     runs-on: ubuntu-latest
     steps:
