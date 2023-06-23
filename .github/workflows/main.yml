@@ -1,13 +1,18 @@
 name: Main-Workflow
 on:
-  pull_request:
+  push:
     branches:
       - Test
+  pull_request:
+    types:
+      - closed
+    branches:
+      - Test
+
 jobs:
   PublishUCD:
-    #needs: Checkout
-    if: github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'Test'
     runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'Test'
     steps:
       - name: Fetch Asana Task Details
         id: fetch-task-details
@@ -15,7 +20,7 @@ jobs:
           ASANA_TOKEN: ${{ secrets.ASANA_TOKEN }}
         run: |
           # Extract the Asana ticket ID from the branch name
-          ticket_id=$(echo "${{ github.head_ref }}" | sed -n 's/.*\([0-9]\{5\}\).*$/\1/p')
+          ticket_id=$(echo "${{ github.event.pull_request.head.ref }}" | sed -n 's/.*\([0-9]\{5\}\).*$/\1/p')
           # Use the ticket ID to fetch the task details from Asana (replace `1204763105220463` with your actual workspace ID)
           task_details=$(curl -s -H "Authorization: Bearer $ASANA_TOKEN" "https://app.asana.com/api/1.0/tasks/${ticket_id}")
           echo "::set-output name=task-details::${task_details}"
