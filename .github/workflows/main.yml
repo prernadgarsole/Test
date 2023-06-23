@@ -1,1 +1,57 @@
 
+name: Main-Workflow
+on:
+  pull_request:
+    branches:
+      - Test
+jobs:
+  Checkout:
+    # ...
+    # Add your existing checkout job configuration here
+    # ...
+  PublishUCD:
+    needs: Checkout
+    if: github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'Test'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch Asana Task Details
+        id: fetch-task-details
+        env:
+          ASANA_TOKEN: ${{ secrets.ASANA_TOKEN }}
+        run: |
+          # Extract the Asana ticket ID from the branch name
+          ticket_id=$(echo "${{ github.head_ref }}" | sed -n 's/.*\([0-9]\{5\}\).*$/\1/p')
+          # Use the ticket ID to fetch the task details from Asana (replace `1204763105220463` with your actual workspace ID)
+          task_details=$(curl -s -H "Authorization: Bearer $ASANA_TOKEN" "https://app.asana.com/api/1.0/tasks/${ticket_id}")
+          echo "::set-output name=task-details::${task_details}"
+      - name: Check Task Status
+        id: check-task-status
+        run: |
+          # Extract the task status from the task details
+          task_status=$(echo "${{ steps.fetch-task-details.outputs.task-details }}" | jq -r '.data.status.name')
+          if [[ "$task_status" != "Ready for Approval" ]]; then
+            echo "Task is not ready for approval. Exiting workflow."
+            exit 1
+          fi
+      - name: Fetch Asana Assignee Email
+        id: fetch-assignee-email
+        run: |
+          # Extract the assignee email from the task details
+          assignee_email=$(echo "${{ steps.fetch-task-details.outputs.task-details }}" | jq -r '.data.assignee.email')
+          echo "::set-output name=assignee-email::${assignee_email}"
+      - name: Send Email
+        uses: dawidd6/action-outlook-mail@v3
+        with:
+          smtp-server: smtp.office365.com
+          smtp-port: 587
+          smtp-username: ${{ secrets.EMAIL_USERNAME }}
+          smtp-password: ${{ secrets.EMAIL_PASSWORD }}
+          to: ${{ steps.fetch-assignee-email.outputs.assignee-email }}
+          subject: Successful deployment notification
+          body: |
+            Dear assignee,
+
+            This is to notify you that the deployment to the TEST environment has been successful.
+
+            Best regards,
+            Your Organization
