@@ -1,11 +1,9 @@
-
 name: Main-Workflow
 on:
   pull_request:
     branches:
       - Test
 jobs:
-
   PublishUCD:
     #needs: Checkout
     if: github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'Test'
