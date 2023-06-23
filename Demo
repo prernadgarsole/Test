@@ -1,0 +1,70 @@
+name: Asana Integration Workflow
+
+on:
+  push:
+    branches:
+      - Testing
+
+jobs:
+  asana:
+    runs-on: windows-latest
+    steps:
+      - name: Install Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+
+      - name: Send Email Notification
+        run: |
+          npm install --save axios @microsoft/office-js
+          node -e "
+            const axios = require('axios');
+            const OfficeJs = require('@microsoft/office-js');
+
+            const branchName = process.env.GITHUB_REF.split('/').pop();
+            const assigneeEmail = 'assignee@example.com'; // Replace with the assignee's email address
+
+            const sendEmailNotification = () => {
+              OfficeJs.initialize();
+
+              OfficeJs.context.mailbox.getCallbackTokenAsync({ isRest: true }, function (result) {
+                if (result.status === OfficeJs.AsyncResultStatus.Succeeded) {
+                  const accessToken = result.value;
+                  const emailEndpoint = 'https://outlook.office.com/api/v2.0/me/sendmail';
+
+                  const emailContent = {
+                    Message: {
+                      Subject: 'Deployment Completed',
+                      Body: {
+                        ContentType: 'Text',
+                        Content: 'Deployment to Testing branch is completed.',
+                      },
+                      ToRecipients: [
+                        {
+                          EmailAddress: {
+                            Address: assigneeEmail,
+                          },
+                        },
+                      ],
+                    },
+                  };
+
+                  axios.post(emailEndpoint, emailContent, {
+                    headers: {
+                      Authorization: 'Bearer ' + accessToken,
+                    },
+                  })
+                    .then(function (response) {
+                      console.log('Email notification sent:', response.data);
+                    })
+                    .catch(function (error) {
+                      console.error('Error sending email:', error);
+                    });
+                } else {
+                  console.error('Error retrieving access token:', result.error);
+                }
+              });
+            };
+
+            sendEmailNotification();
+          "
