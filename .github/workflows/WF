@@ -24,7 +24,7 @@ jobs:
           # Extract the Asana ticket ID from the branch name
           ticket_id=$(echo "${{ github.head_ref }}" | sed -n 's/.*\([0-9]\{5\}\).*$/\1/p')
           # Use the ticket ID to fetch the task details from Asana (replace `WORKSPACE_ID` with your actual workspace ID)
-          task_details=$(curl -s -H "Authorization: Bearer $ASANA_TOKEN" "https://app.asana.com/api/1.0/tasks/${ticket_id}")
+          task_details=$(curl -s -H "Authorization: Bearer $ASANA_TOKEN" "https://app.asana.com/api/1.0/tasks/${ticket_id}?workspace=WORKSPACE_ID")
           echo "::set-output name=task-details::${task_details}"
 
       - name: Check Task Status
