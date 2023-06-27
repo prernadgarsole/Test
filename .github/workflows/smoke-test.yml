@@ -110,8 +110,8 @@ jobs:
             const axios = require('axios');
 
             const token = '1/1200663996881544:3dfe48082ee0407050945c1cf1daaff7'; // Replace with your Asana Personal Access Token
-            const workspaceId = '10415102240585'; // Replace with your Asana Workspace ID
-            const projectId = '16867711203404129'; // Replace with your Asana Project ID
+            const workspaceId = '1878885102240585'; // Replace with your Asana Workspace ID
+            const projectId = '1201711203404129'; // Replace with your Asana Project ID
 
             const testAsanaAPI = async () => {
               try {
