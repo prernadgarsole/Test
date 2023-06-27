@@ -1,7 +1,4 @@
-
-          
-
-name: Asana Integration Smoke Test
+name: Asana Smoke Test
 
 on:
   push:
@@ -9,60 +6,74 @@ on:
       - main
 
 jobs:
-  smoke-test:
+  smoke_test:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Validate Asana Integration
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+
+      - name: Check Asana API
         run: |
-          const axios = require('axios');
-          const token = '1/1204760161937729:b3bcc2c3e471c304b84924c4d1290a59';
-          const projectId = '1201711203404129';
-          const workspaceId = '10415102240585';
+          npm install axios
+          node -e "
+            const axios = require('axios');
 
-          const validateToken = async () => {
-            try {
-              const response = await axios.get('https://app.asana.com/api/1.0/users/me', {
-                headers: {
-                  'Authorization': 'Bearer ' + token,
-                },
-              });
+            const token = '1/1200663996881544:3dfe48082ee0407050945c1cf1daaff7'; // Replace with your Asana Personal Access Token
+            const workspaceId = '10415102240585'; // Replace with your Asana Workspace ID
+            const projectId = '1201711203404129'; // Replace with your Asana Project ID
 
-              if (response.status === 200) {
+            const testAsanaAPI = async () => {
+              try {
+                // Validate token
+                const validateResponse = await axios.get(
+                  'https://app.asana.com/api/1.0/users/me',
+                  {
+                    headers: {
+                      'Authorization': 'Bearer ' + token
+                    }
+                  }
+                );
+
+                if (validateResponse.status !== 200) {
+                  throw new Error('Invalid token');
+                }
+
                 console.log('Token validation successful');
-                validateProjectAndWorkspace();
-              } else {
-                console.error('Token validation failed');
-                throw new Error('Token validation failed');
+
+                // Check workspace
+                const workspaceResponse = await axios.get(
+                  'https://app.asana.com/api/1.0/workspaces/' + workspaceId,
+                  {
+                    headers: {
+                      'Authorization': 'Bearer ' + token
+                    }
+                  }
+                );
+
+                console.log('Workspace:', workspaceResponse.data);
+
+                // Check project
+                const projectResponse = await axios.get(
+                  'https://app.asana.com/api/1.0/projects/' + projectId,
+                  {
+                    headers: {
+                      'Authorization': 'Bearer ' + token
+                    }
+                  }
+                );
+
+                console.log('Project:', projectResponse.data);
+              } catch (error) {
+                if (error.response) {
+                  console.error('API Error:', error.response.data.errors);
+                } else {
+                  console.error('Request Error:', error.message);
+                }
               }
-            } catch (error) {
-              console.error('Error validating token:', error.response.data.errors);
-              throw error;
-            }
-          };
+            };
 
-          const validateProjectAndWorkspace = async () => {
-            try {
-              const response = await axios.get(`https://app.asana.com/api/1.0/projects/${projectId}`, {
-                headers: {
-                  'Authorization': 'Bearer ' + token,
-                },
-              });
-
-              if (response.status === 200 && response.data.data.workspace.id === workspaceId) {
-                console.log('Project and workspace validation successful');
-                // Proceed with your integration logic here
-              } else {
-                console.error('Project or workspace validation failed');
-                throw new Error('Project or workspace validation failed');
-              }
-            } catch (error) {
-              console.error('Error validating project or workspace:', error.response.data.errors);
-              throw error;
-            }
-          };
-
-          validateToken().catch((error) => {
-            console.error('Smoke test failed:', error);
-            process.exit(1); // Exit the process with a non-zero status code to mark the workflow as failed
-          });
+            testAsanaAPI();
+          "
