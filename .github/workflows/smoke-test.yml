@@ -13,7 +13,7 @@ jobs:
       - name: Validate Asana Integration
         run: |
           const axios = require('axios');
-          const token = '1/1200663996881544:3dfe407050945c1cf1daaff7';
+          const token = '1/1204760161937729:b3bcc2c3e471c304b84924c4d1290a59';
               const projectId = '1201711203404129';
               const workspaceId = '10415102240585';
 
