@@ -1,0 +1,16 @@
+name: Token Smoke Test
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Token
+        run: |
+          # Perform a simple action using the token
+          # For example, you can fetch the list of workspaces
+          curl -X GET -H "Authorization: Bearer 1/1200663996881544:3dfe48082ee0407050945c1cf1daaff7" "https://app.asana.com/api/1.0/workspaces"
