@@ -1,16 +1,45 @@
-name: Token Smoke Test
+const axios = require('axios');
 
-on:
-  push:
-    branches:
-      - main
+const token = '1/1200663996881544:3dfe48082ee0407050945c1cf1daaff7';
+const projectId = '1201711203404129';
+const workspaceId = '10415102240585';
 
-jobs:
-  smoke-test:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check Token
-        run: |
-          # Perform a simple action using the token
-          # For example, you can fetch the list of workspaces
-          curl -X GET -H "Authorization: Bearer 1/120066881544:3d082ee0407050945c1cf1daaff7" "https://app.asana.com/api/1.0/workspaces"
+const validateToken = async () => {
+  try {
+    const response = await axios.get('https://app.asana.com/api/1.0/users/me', {
+      headers: {
+        'Authorization': 'Bearer ' + token,
+      },
+    });
+
+    if (response.status === 200) {
+      console.log('Token validation successful');
+      validateProjectAndWorkspace();
+    } else {
+      console.error('Token validation failed');
+    }
+  } catch (error) {
+    console.error('Error validating token:', error.response.data.errors);
+  }
+};
+
+const validateProjectAndWorkspace = async () => {
+  try {
+    const response = await axios.get(`https://app.asana.com/api/1.0/projects/${projectId}`, {
+      headers: {
+        'Authorization': 'Bearer ' + token,
+      },
+    });
+
+    if (response.status === 200 && response.data.data.workspace.id === workspaceId) {
+      console.log('Project and workspace validation successful');
+      // Proceed with your integration logic here
+    } else {
+      console.error('Project or workspace validation failed');
+    }
+  } catch (error) {
+    console.error('Error validating project or workspace:', error.response.data.errors);
+  }
+};
+
+validateToken();
