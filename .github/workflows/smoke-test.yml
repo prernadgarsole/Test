@@ -1,4 +1,91 @@
 
+# name: Asana Smoke Test
+
+# on:
+#   push:
+#     branches:
+#       - main
+
+# jobs:
+#   smoke_test:
+#     runs-on: ubuntu-latest
+
+#     steps:
+#       - name: Set up Node.js
+#         uses: actions/setup-node@v2
+#         with:
+#           node-version: '14'
+
+#       - name: Check Asana API
+#         run: |
+#           npm install axios
+#           node -e "
+#             const axios = require('axios');
+
+#             const token = '1/1200663996881544:3dfe48082ee0407050945c1cf1daaff7'; // Replace with your Asana Personal Access Token
+#             const workspaceId = '10415102240585'; // Replace with your Asana Workspace ID
+#             const projectId = '1201711203404129'; // Replace with your Asana Project ID
+
+#             const testAsanaAPI = async () => {
+#               try {
+#                 // Validate token
+#                 const validateResponse = await axios.get(
+#                   'https://app.asana.com/api/1.0/users/me',
+#                   {
+#                     headers: {
+#                       'Authorization': 'Bearer ' + token
+#                     }
+#                   }
+#                 );
+
+#                 if (validateResponse.status !== 200) {
+#                   throw new Error('Invalid token');
+#                 }
+
+#                 console.log('Token validation successful');
+
+#                 // Check workspace
+#                 const workspaceResponse = await axios.get(
+#                   'https://app.asana.com/api/1.0/workspaces/' + workspaceId,
+#                   {
+#                     headers: {
+#                       'Authorization': 'Bearer ' + token
+#                     }
+#                   }
+#                 );
+
+#                 console.log('Workspace:', workspaceResponse.data);
+
+#                 // Check project
+#                 const projectResponse = await axios.get(
+#                   'https://app.asana.com/api/1.0/projects/' + projectId,
+#                   {
+#                     headers: {
+#                       'Authorization': 'Bearer ' + token
+#                     }
+#                   }
+#                 );
+
+#                 console.log('Project:', projectResponse.data);
+#               } catch (error) {
+#                 if (error.response) {
+#                   console.error('API Error:', error.response.data.errors);
+#                 } else {
+#                   console.error('Request Error:', error.message);
+#                 }
+
+#                 process.exit(1); // Exit the workflow with an error status
+#               }
+#             };
+
+#             testAsanaAPI();
+#           "
+
+
+
+
+
+
 name: Asana Smoke Test
 
 on:
@@ -22,8 +109,8 @@ jobs:
           node -e "
             const axios = require('axios');
 
-            const token = '0001/1200663996881544:3dfe48082ee0407050945c1cf1daaff7'; // Replace with your Asana Personal Access Token
-            const workspaceId = '10415102240585'; // Replace with your Asana Workspace ID
+            const token = '1/1200663996881544:3dfe48082ee0407050945c1cf1daaff7'; // Replace with your Asana Personal Access Token
+            const workspaceId = '000010415102240585'; // Replace with your Asana Workspace ID
             const projectId = '1201711203404129'; // Replace with your Asana Project ID
 
             const testAsanaAPI = async () => {
@@ -66,6 +153,10 @@ jobs:
                   }
                 );
 
+                if (projectResponse.status !== 200) {
+                  throw new Error('Invalid project ID');
+                }
+
                 console.log('Project:', projectResponse.data);
               } catch (error) {
                 if (error.response) {
@@ -80,3 +171,4 @@ jobs:
 
             testAsanaAPI();
           "
+
