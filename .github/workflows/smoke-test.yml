@@ -14,9 +14,8 @@ jobs:
         run: |
           const axios = require('axios');
           const token = '1/1204760161937729:b3bcc2c3e471c304b84924c4d1290a59';
-              const projectId = '1201711203404129';
-              const workspaceId = '10415102240585';
-
+          const projectId = '1201711203404129';
+          const workspaceId = '10415102240585';
 
           const validateToken = async () => {
             try {
@@ -31,11 +30,11 @@ jobs:
                 validateProjectAndWorkspace();
               } else {
                 console.error('Token validation failed');
-                exit 1;
+                throw new Error('Token validation failed');
               }
             } catch (error) {
               console.error('Error validating token:', error.response.data.errors);
-              exit 1;
+              throw error;
             }
           };
 
@@ -52,15 +51,15 @@ jobs:
                 // Proceed with your integration logic here
               } else {
                 console.error('Project or workspace validation failed');
-                exit 1;
+                throw new Error('Project or workspace validation failed');
               }
             } catch (error) {
               console.error('Error validating project or workspace:', error.response.data.errors);
-              exit 1;
+              throw error;
             }
           };
 
-          validateToken();
-
-
-           
+          validateToken().catch((error) => {
+            console.error('Smoke test failed:', error);
+            process.exit(1); // Exit the process with a non-zero status code to mark the workflow as failed
+          });
