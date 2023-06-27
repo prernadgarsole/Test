@@ -8,3 +8,149 @@ check
 	https://app.asana.com/0/1201265161533324/1204906443823059/f
 	
 1201265161533324
+
+
+
+
+name: Main-Workflow
+on:
+  pull_request:
+    branches:
+      - Test
+      - master
+
+jobs:
+  Checkout:
+    uses: ./.github/workflows/checkout.yml
+    secrets: inherit
+
+  AsanaGithubaction:
+    needs: Checkout
+    if: github.event.pull_request.base.ref == 'Test' && github.event.pull_request.head.ref == 'WorkingBranch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch Asana Task Details
+        id: fetch-task-details
+        env:
+          ASANA_TOKEN: ${{ secrets.ASANA_TOKEN }}
+        run: |
+          # Extract the Asana ticket ID from the working branch name
+          ticket_id=$(echo "${{ github.head_ref }}" | sed -n 's/.*\([0-9]\{5\}\).*$/\1/p')
+          # Use the ticket ID to fetch the task details from Asana (replace `WORKSPACE_ID` with actual workspace ID)
+          task_details=$(curl -s -H "Authorization: Bearer $ASANA_TOKEN" "https://app.asana.com/api/1.0/tasks/${ticket_id}?workspace=WORKSPACE_ID")
+          echo "::set-output name=task-details::${task_details}"
+
+      - name: Check Task Status
+        id: check-task-status
+        run: |
+          # Extract the task status from the task details
+          task_status=$(echo "${{ steps.fetch-task-details.outputs.task-details }}" | jq -r '.data.status.name')
+          if [[ "$task_status" != "Ready for Approval" ]]; then
+            echo "Task is not ready for approval. Exiting workflow."
+            exit 1
+          fi
+
+      - name: Fetch Asana Assignee Email
+        id: fetch-assignee-email
+        run: |
+          # Extract the assignee email from the task details
+          assignee_email=$(echo "${{ steps.fetch-task-details.outputs.task-details }}" | jq -r '.data.assignee.email')
+          echo "::set-output name=assignee-email::${assignee_email}"
+
+      - name: Send Email to Assignee
+        uses: dawidd6/action-outlook-mail@v3
+        with:
+          smtp-server: smtp.office365.com
+          smtp-port: 587
+          to: ${{ steps.fetch-assignee-email.outputs.assignee-email }}
+          subject: Successful deployment notification
+          body: |
+            Dear assignee,
+
+            This is to notify you that the deployment to the TEST environment has been successful.
+
+            Best regards,
+            Your Organization
+
+  DeployToProd:
+    needs: PublishUCD
+    if: github.event.pull_request.base.ref == 'master' && github.event.pull_request.head.ref == 'WorkingBranch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch Asana Task Details
+        id: fetch-task-details
+        env:
+          ASANA_TOKEN: ${{ secrets.ASANA_TOKEN }}
+        run: |
+          # Extract the Asana ticket ID from the branch name
+          ticket_id=$(echo "${{ github.head_ref }}" | sed -n 's/.*\([0-9]\{5\}\).*$/\1/p')
+          # Use the ticket ID to fetch the task details from Asana (replace `WORKSPACE_ID` with actual workspace ID)
+          task_details=$(curl -s -H "Authorization: Bearer $ASANA_TOKEN" "https://app.asana.com/api/1.0/tasks/${ticket_id}?workspace=WORKSPACE_ID")
+          echo "::set-output name=task-details::${task_details}"
+
+           - name: Check Task Status
+        id: check-task-status
+        run: |
+          # Extract the task status from the task details
+          task_status=$(echo "${{ steps.fetch-task-details.outputs.task-details }}" | jq -r '.data.status.name')
+          if [[ "$task_status" != "Approved" ]]; then
+            echo "Task is not approved. Exiting workflow."
+            exit 1
+          fi
+
+      - name: Fetch Asana Requester Email
+        id: fetch-requester-email
+        run: |
+          # Extract the requester email from the task details
+          requester_email=$(echo "${{ steps.fetch-task-details.outputs.task-details }}" | jq -r '.data.requester.email')
+          echo "::set-output name=requester-email::${requester_email}"
+
+      - name: Send Email to Requester
+        uses: dawidd6/action-outlook-mail@v3
+        with:
+          smtp-server: smtp.office365.com
+          smtp-port: 587
+          to: ${{ steps.fetch-requester-email.outputs.requester-email }}
+          subject: Successful deployment notification
+          body: |
+            
+		Hello Submitter,
+		
+		Thank you for your previous feedback on the MSR Tools!
+		
+		Your requested update has been completed and is being used by MSRs now! Your contribution has been invaluable to keeping the MSR Tool suite working smoothly, and we really appreciate you.
+		
+		Thank you again and have a great day!
+	
+	 - name: Fetch Asana Assignee Email
+	        id: fetch-assignee-email
+	        run: |
+	          # Extract the assignee email from the task details
+	          assignee_email=$(echo "${{ steps.fetch-task-details.outputs.task-details }}" | jq -r '.data.assignee.email')
+	          echo "::set-output name=assignee-email::${assignee_email}"
+	
+	      - name: Send Email to Assignee
+	        uses: dawidd6/action-outlook-mail@v3
+	        with:
+	          smtp-server: smtp.office365.com
+	          smtp-port: 587
+	          to: ${{ steps.fetch-assignee-email.outputs.assignee-email }}
+	          subject: Successful deployment notification
+	          body: |
+	            Dear assignee,
+	
+	            This is to notify you that the deployment to the Prod environment has been successful.
+	
+	            Best regards,
+	            Your Organization
+	
+		
+PublishUCD:
+    needs: AsanaGithubaction
+    uses: ./.github/workflows/ucd.yml
+    secrets: inherit	
+		
+PublishGitHub:
+    needs: PublishUCD
+    uses: ./.github/workflows/upload.yml
+    secrets: inherit  
