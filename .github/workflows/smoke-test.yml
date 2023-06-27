@@ -13,4 +13,4 @@ jobs:
         run: |
           # Perform a simple action using the token
           # For example, you can fetch the list of workspaces
-          curl -X GET -H "Authorization: Bearer 1/1200663996881544:3dfe48082ee0407050945c1cf1daaff7" "https://app.asana.com/api/1.0/workspaces"
+          curl -X GET -H "Authorization: Bearer 1/120066881544:3d082ee0407050945c1cf1daaff7" "https://app.asana.com/api/1.0/workspaces"
