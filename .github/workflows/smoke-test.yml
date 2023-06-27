@@ -1,3 +1,4 @@
+
 name: Asana Smoke Test
 
 on:
@@ -72,6 +73,8 @@ jobs:
                 } else {
                   console.error('Request Error:', error.message);
                 }
+
+                process.exit(1); // Exit the workflow with an error status
               }
             };
 
