@@ -231,3 +231,136 @@ steps:
       #### Filter branch names with condition. To skip scans on less significant branchs.
       condition: |
           and(succeeded(), or(eq(variables['Build.Reason'], 'PullRequest'), eq(variables['Build.Reason'], 'Schedule'), eq(variables['Build.SourceBranchName'], 'master'), eq(variables['Build.SourceBranchName'], 'main'), eq(variables['Build.SourceBranchName'], 'develop'), eq(variables['Build.SourceBranchName'], 'dev2'), eq(variables['Build.SourceBranchName'], 'development'), eq(variables['Build.SourceBranchName'], 'dev2'), contains(lower(variables['Build.SourceBranch']), 'hotfix'), contains(lower(variables['Build.SourceBranch']), 'release'), contains(lower(variables['Build.SourceBranch']), 'feature'), contains(lower(variables['Build.SourceBranch']), 'user')))
+
+
+
+
+
+
+def runBlackDuckScan(String blackduckInstance, boolean preserveBranchName, boolean addTaskSummary, boolean useAirGap, String extractedDetectDirectory, String extraArgs, boolean enableTask, String taskVersion, boolean continueOnError, boolean blackduckVarsYmlRef, boolean blackduckContinueOnError) {
+
+    def bdProjectName = "--detect.project.name=\"'${System.TeamProject}/${Build.Repository.Name}'\""
+    def bdProjectNameW = "--detect.project.name=\"${System.TeamProject}/${Build.Repository.Name}\""
+    def commonArgs = "--detect.detector.search.depth=5 --detect.timeout=900 --Detect.cleanup=true --detect.report.timeout=10000 --detect.risk.report.pdf.path=\"${Build.StagingDirectory}/bdscans\""
+    def bdArgsRapidArgs = "--detect.blackduck.scan.mode=RAPID --detect.bom.aggregate.name=aggregated.bdio"
+    def bdArgsFullArgs = "--detect.project.application.id=\"${System.TeamProjectId}\" --detect.project.description=\"${Build.Repository.Name}\" --detect.project.version.notes=\"Branch is ${Build.SourceBranchName} ${Build.SourceVersion} ${Build.SourceVersionMessage}\""
+    def bdArgsMasterArgs = "--detect.project.version.name=production --detect.project.version.phase=RELEASED --detect.policy.check.fail.on.severities=ALL"
+    def bdArgsFeatureArgs = "--detect.project.version.name=feature --detect.project.version.phase=PLANNING"
+    def bdArgsReleaseArgs = "--detect.project.version.name=release-${Build.SourceBranchName} --detect.project.version.phase=PRERELEASE --detect.policy.check.fail.on.severities=ALL"
+    def bdPrArgs = "--detect.project.version.name=PR --detect.project.version.phase=PRERELEASE --detect.policy.check.fail.on.severities=ALL"
+    def bdArgsDevelopArgs = "--detect.project.version.name=development --detect.project.version.phase=DEVELOPMENT --detect.policy.check.fail.on.severities=ALL"
+    def q = "'"
+
+    def detectArguments(boolean preserveBranchName) {
+        if (!preserveBranchName) {
+            if (['master', 'main'].contains(variables['Build.SourceBranchName'])) {
+                return """
+                    ${bdProjectName}
+                    ${bdArgsFullArgs}
+                    ${bdArgsMasterArgs}
+                    --detect.code.location.name="${q}${System.TeamProject}/${Build.Repository.Name}-${Build.SourceBranchName}${q}"
+                    ${commonArgs}
+                    ${extraArgs}
+                """
+            } else if (['develop', 'development', 'dev2'].contains(variables['Build.SourceBranchName'])) {
+                return """
+                    ${bdProjectName}
+                    ${bdArgsFullArgs}
+                    ${bdArgsDevelopArgs}
+                    --detect.code.location.name="${q}${System.TeamProject}/${Build.Repository.Name}-${Build.SourceBranchName}${q}"
+                    ${commonArgs}
+                    ${extraArgs}
+                """
+            } else if (variables['Build.SourceBranchName'].startsWith('release/')) {
+                return """
+                    ${bdProjectName}
+                    ${bdArgsFullArgs}
+                    ${bdArgsReleaseArgs}
+                    --detect.code.location.name="${q}${System.TeamProject}/${Build.Repository.Name}-${Build.SourceBranchName}${q}"
+                    ${commonArgs}
+                    ${extraArgs}
+                """
+            } else if (variables['Build.SourceBranchName'].startsWith('PR/')) {
+                return """
+                    ${bdProjectName}
+                    ${bdArgsFullArgs}
+                    ${bdPrArgs}
+                    --detect.code.location.name="${q}${System.TeamProject}/${Build.Repository.Name}-${Build.SourceBranchName}${q}"
+                    ${commonArgs}
+                   
+                ${extraArgs}
+            """
+        } else {
+            return """
+                ${bdProjectName}
+                ${bdArgsFullArgs}
+                ${bdArgsFeatureArgs}
+                --detect.code.location.name="${q}${System.TeamProject}/${Build.Repository.Name}-${Build.SourceBranchName}${q}"
+                ${commonArgs}
+                ${extraArgs}
+            """
+        }
+    }
+
+    def condition() {
+        return """
+            succeededOrFailed()
+        """
+    }
+
+    if (enableTask) {
+        if (!blackduckVarsYmlRef) {
+            synopsysDetectTask(
+                displayName: 'SCA Scan Blackduck',
+                name: 'SCAScanBlackduckL',
+                blackDuckService: blackduckInstance,
+                detectArguments: detectArguments(preserveBranchName),
+                useAirGap: useAirGap,
+                detectAirGapJarDirectoryPath: extractedDetectDirectory,
+                addTaskSummary: addTaskSummary,
+                continueOnError: continueOnError,
+                condition: condition()
+            )
+        } else {
+            synopsysDetectTask(
+                displayName: 'SCA Scan Blackduck',
+                name: 'SCAScanBlackduck',
+                blackDuckService: blackduckInstance,
+                detectArguments: blackduckDetectArguments,
+                addTaskSummary: blackduckAddTaskSummary,
+                continueOnError: blackduckContinueOnError,
+                condition: condition()
+            )
+// Add logic to prevent further builds/promotions on failure
+        if (currentBuild.result.isWorseOrEqualTo(hudson.model.Result.FAILURE)) {
+            error('Black Duck scan failed. Further builds/promotions are blocked.')
+        }
+        }
+    }
+}
+
+// Example usage
+runBlackDuckScan('BLACKDUCK-PROD', false, true, false, '', '', true, '8', true, false, true)
+
+
+
+
+—————
+
+node {
+  stage("Black Duck Scanning") {
+    try {
+      blackDuckScan(
+        isDev: params.isDev,
+        preserveBranchName: params.preserveBranchName,
+        extraParams: params.extraParams,
+        blackduckInstance: params.blackduckInstance,
+        additionalParam1: params.additionalParam1,
+        additionalParam2: params.additionalParam2
+        // Add any other additional parameters as needed
+      )
+    } catch (Exception e) {
+      error("Black Duck Scanning failed: ${e.getMessage()}")
+    }
+  }
+}
