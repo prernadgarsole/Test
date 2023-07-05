@@ -1,109 +1,69 @@
-name: Main-Workflow
-on:
-  pull_request:
-    branches:
-      - Test
-      - master
+name: Send Email Action
+description: Custom action for sending emails
+inputs:
+  smtp-server:
+    description: 'SMTP server for sending emails'
+    required: true
+  smtp-port:
+    description: 'SMTP port for the SMTP server'
+    required: true
+  to:
+    description: 'Recipient email address'
+    required: true
+  subject:
+    description: 'Email subject'
+    required: true
+  body:
+    description: 'Email body'
+    required: true
+runs:
+  using: 'node12'
+  main: 'index.js'
 
-jobs:
-  Checkout:
-    # ...
-    # Add your existing checkout job configuration here
-    # ...
 
-  PublishUCD:
-    needs: Checkout
-    if: github.event.pull_request.base.ref == 'Test' && github.event.pull_request.head.ref == 'Test'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Fetch Asana Task Details
-        id: fetch-task-details
-        env:
-          ASANA_TOKEN: ${{ secrets.ASANA_TOKEN }}
-        run: |
-          # Extract the Asana ticket ID from the branch name
-          ticket_id=$(echo "${{ github.head_ref }}" | sed -n 's/.*\([0-9]\{5\}\).*$/\1/p')
-          # Use the ticket ID to fetch the task details from Asana (replace `WORKSPACE_ID` with your actual workspace ID)
-          task_details=$(curl -s -H "Authorization: Bearer $ASANA_TOKEN" "https://app.asana.com/api/1.0/tasks/${ticket_id}?workspace=WORKSPACE_ID")
-          echo "::set-output name=task-details::${task_details}"
 
-      - name: Check Task Status
-        id: check-task-status
-        run: |
-          # Extract the task status from the task details
-          task_status=$(echo "${{ steps.fetch-task-details.outputs.task-details }}" | jq -r '.data.status.name')
-          if [[ "$task_status" != "Ready for Approval" ]]; then
-            echo "Task is not ready for approval. Exiting workflow."
-            exit 1
-          fi
 
-      - name: Fetch Asana Assignee Email
-        id: fetch-assignee-email
-        run: |
-          # Extract the assignee email from the task details
-          assignee_email=$(echo "${{ steps.fetch-task-details.outputs.task-details }}" | jq -r '.data.assignee.email')
-          echo "::set-output name=assignee-email::${assignee_email}"
+const nodemailer = require('nodemailer');
 
-      - name: Send Email to Assignee
-        uses: dawidd6/action-outlook-mail@v3
-        with:
-          smtp-server: smtp.office365.com
-          smtp-port: 587
-          to: ${{ steps.fetch-assignee-email.outputs.assignee-email }}
-          subject: Successful deployment notification
-          body: |
-            Dear assignee,
+async function run() {
+  try {
+    const transporter = nodemailer.createTransport({
+      host: process.env.INPUT_SMTP_SERVER,
+      port: process.env.INPUT_SMTP_PORT,
+    });
 
-            This is to notify you that the deployment to the TEST environment has been successful.
+    const mailOptions = {
+      from: 'your-email@example.com',
+      to: process.env.INPUT_TO,
+      subject: process.env.INPUT_SUBJECT,
+      text: process.env.INPUT_BODY,
+    };
 
-            Best regards,
-            Your Organization
+    await transporter.sendMail(mailOptions);
+    console.log('Email sent successfully');
+  } catch (error) {
+    console.error('Failed to send email:', error);
+    process.exit(1);
+  }
+}
 
-  DeployToProd:
-    needs: Checkout
-    if: github.event.pull_request.base.ref == 'master' && github.event.pull_request.head.ref == 'master'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Fetch Asana Task Details
-        id: fetch-task-details
-        env:
-          ASANA_TOKEN: ${{ secrets.ASANA_TOKEN }}
-        run: |
-          # Extract the Asana ticket ID from the branch name
-          ticket_id=$(echo "${{ github.head_ref }}" | sed -n 's/.*\([0-9]\{5\}\).*$/\1/p')
-          # Use the ticket ID to fetch the task details from Asana (replace `WORKSPACE_ID` with your actual workspace ID)
-         task_details=$(curl -s -H "Authorization: Bearer $ASANA_TOKEN" "https://app.asana.com/api/1.0/tasks/${ticket_id}?workspace=WORKSPACE_ID")
-          echo "::set-output name=task-details::${task_details}"
+run();
 
-           - name: Check Task Status
-        id: check-task-status
-        run: |
-          # Extract the task status from the task details
-          task_status=$(echo "${{ steps.fetch-task-details.outputs.task-details }}" | jq -r '.data.status.name')
-          if [[ "$task_status" != "Approved" ]]; then
-            echo "Task is not approved. Exiting workflow."
-            exit 1
-          fi
 
-      - name: Fetch Asana Requester Email
-        id: fetch-requester-email
-        run: |
-          # Extract the requester email from the task details
-          requester_email=$(echo "${{ steps.fetch-task-details.outputs.task-details }}" | jq -r '.data.requester.email')
-          echo "::set-output name=requester-email::${requester_email}"
 
-      - name: Send Email to Requester
-        uses: dawidd6/action-outlook-mail@v3
-        with:
-          smtp-server: smtp.office365.com
-          smtp-port: 587
-          to: ${{ steps.fetch-requester-email.outputs.requester-email }}
-          subject: Successful deployment notification
-          body: |
-            Dear requester,
 
-            This is to notify you that your requested changes have been deployed live to the PROD environment.
 
-            Best regards,
-            Your Organization
+- name: Send Email to Assignee
+  uses: your-custom-action-repo/send-email-action@v1
+  with:
+    smtp-server: YOUR_SMTP_SERVER
+    smtp-port: YOUR_SMTP_PORT
+    to: ${{ steps.fetch-assignee-email.outputs.assignee-email }}
+    subject: Successful deployment notification
+    body: |
+      Dear assignee,
 
+      This is to notify you that the deployment to the TEST environment has been successful.
+
+      Best regards,
+      YOUR_ORGANIZATION
