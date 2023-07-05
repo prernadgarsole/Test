@@ -50,6 +50,40 @@ async function run() {
 run();
 
 
+---
+
+
+name: Send Email Workflow
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  sendEmailJob:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Send Email
+        uses: your-custom-action-repo/send-email-action@v1
+        with:
+          smtp-server: smtp.example.com
+          smtp-port: 587
+          to: recipient@example.com
+          subject: Successful deployment notification
+          body: |
+            Dear recipient,
+
+            This is to notify you that the deployment has been successful.
+
+            Best regards,
+            Your Organization
+
+
+
+
 
 
 
