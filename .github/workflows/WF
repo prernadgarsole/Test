@@ -101,3 +101,25 @@ jobs:
 
       Best regards,
       YOUR_ORGANIZATION
+
+
+
+
+
+
+
+
+name: Print Repo Name
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  printRepoName:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print Repo Name
+        run: |
+          echo "Current Repository: ${{ github.repository }}"
