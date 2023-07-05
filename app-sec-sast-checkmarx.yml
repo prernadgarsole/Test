@@ -121,3 +121,258 @@ steps:
         vulnerabilityThreshold: ${{ parameters.checkmarxVulnerabilityThreshold }}
         failBuildForNewVulnerabilitiesEnabled: ${{ parameters.checkmarxFailBuildForNewVulnerabilitiesEnabled }}
         generatePDFReport: ${{ parameters.checkmarxGeneratePDFReport }}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        =====
+
+        # This workflow will build a Java project with Ant
+# For more information see: https://help.github.com/actions/language-and-framework-guides/building-and-testing-java-with-ant
+
+name: UCD-Publish
+
+on:
+   workflow_call:
+ 
+env:
+   ## Sets environment variables
+   JAVA_HOME: d:\cm\jdk\jdk-11.0.16
+   _JAVA_OPTIONS: -Djavax.net.ssl.trustStore=d:/cm/jdk/truststore/nfcu_truststore.jks
+   DS_AUTH_TOKEN: ${{secrets.DS_AUTH_TOKEN}}
+   DS_WEB_URL: https://testudeploy.nfcutest.net:8443
+   
+   ucd_cmd_windows: d:\cm\udclient\udclient.cmd --verbose
+   ucd_application: MSR-Tools
+   ucd_application_process:  Install_Files
+   ucd_component: MSR-Tools_App
+   ucd_environment: INTG
+   
+   DEPLOY: true
+   DEPLOYMENT_DIR: codebase
+
+jobs:
+   UCD-Publish:
+
+    runs-on: self-hosted
+
+    steps:
+    - name: set_vars
+      id: vars
+      run: echo "::set-output name=GITHUB_SHORT_SHA::$(git rev-parse --short HEAD)"
+
+    - name: UCDPublish
+      id: UCDPublish
+      run: |
+        echo "GITHUB_REPO": ${{ github.repository }}"
+        echo "GITHUB_REPO_FROM_ENV": {{ env.GITHUB_REPOSITORY }}"
+        echo "GITHUB_REF_NAME: $env:GITHUB_REF_NAME"
+        echo "GITHUB_SHA: $env:GITHUB_SHA"
+        echo "GITHUB_SHORT_SHA: ${{ steps.vars.outputs.GITHUB_SHORT_SHA }}"
+        dir .
+        
+        $ucd_version="$env:GITHUB_REPOSITORY"+"_"+"$env:GITHUB_REF_NAME"+"_"+"$env:GITHUB_RUN_NUMBER"+"_"+"${{ steps.vars.outputs.GITHUB_SHORT_SHA }}"
+        echo "ucd_version: $ucd_version"        
+       
+        $ucd_desc="$env:GITHUB_SERVER_URL"+"/"+"$env:GITHUB_REPOSITORY"+"/"+"commit"+"/"+"${{ steps.vars.outputs.GITHUB_SHORT_SHA }}"
+        echo "ucd_desc: $ucd_desc"
+        
+
+        $ucdCreateVersion = New-Item -ItemType File -path .\ucdCreateVersion.cmd -Force
+        Add-Content $ucdCreateVersion -Value "$env:ucd_cmd_windows createVersion  -component $env:ucd_component -name $ucd_version -description $ucd_desc"
+
+        $ucdAddVersionFiles = New-Item -ItemType File -path .\ucdAddVersionFiles.cmd -Force
+        Add-Content $ucdAddVersionFiles -Value "$env:ucd_cmd_windows addVersionFiles -component $env:ucd_component -base $env:DEPLOYMENT_DIR -version $ucd_version"
+
+        .\ucdCreateVersion.cmd
+        .\ucdAddVersionFiles.cmd
+        
+         # Set output variables for the next step
+         echo "ucd_desc=$ucd_desc" >> "$GITHUB_OUTPUT"
+         #echo "ucd_version=$ucd_version"  >> "$GITHUB_OUTPUT"
+         echo "::set-output name=ucd_version::$ucd_version"
+         
+    - name: Deploy Step
+      id: UCDDeploy
+      if: env.DEPLOY == 'true'
+      run: |
+        echo "Deployment started..."
+        #echo {"application":"${{ env.ucd_application }}","description":"${{ env.ucd_application}}:${{ steps.vars.outputs.GITHUB_SHORT_SHA }}","applicationProcess":"${{ env.ucd_application_process }}","environment":"${{ env.ucd_environment }}","versions":[{"version":"deploy-mgmt-test/DeplMgmtApp_feature-Asana-GH-Integration-POC_345_baabe19","component":"${{ env.ucd_component }}"}]} 
+        #> .\deploy.json
+       
+        $ucdDeployJson = New-Item -ItemType File -path .\deploy.json -Force
+        # Working - Add-Content $ucdDeployJson -Value '{ "application": "MSR-Tools","description": "MSR-Tools:c3e5342","applicationProcess": "Install_Files","environment": "INTG","versions": [{ "version": "deploy-mgmt-test/DeplMgmtApp_feature-Asana-GH-Integration-POC_345_baabe19","component": "MSR-Tools_App" }] }'
+        #Add-Content $ucdDeployJson -Value '{ "application": "${{ env.ucd_application }}", "description": "${{ env.ucd_application}}:${{ steps.vars.outputs.GITHUB_SHORT_SHA }}", "applicationProcess": "${{ env.ucd_application_process }}","environment": "${{ env.ucd_environment }}","versions": [{"version": "${{ steps.UCDPublish.outputs.ucd_version }}","component": "${{ env.ucd_component }}" }] }'
+        Add-Content $ucdDeployJson -Value '{ "application": "${{ env.ucd_application }}", "description": "${{ steps.UCDPublish.outputs.ucd_desc }}", "applicationProcess": "${{ env.ucd_application_process }}","environment": "${{ env.ucd_environment }}","versions": [{"version": "${{ steps.UCDPublish.outputs.ucd_version }}","component": "${{ env.ucd_component }}" }] }'
+        type .\deploy.json
+        
+        echo ${{ env.ucd_cmd_windows }} requestApplicationProcess  .\deploy.json
+        ${{ env.ucd_cmd_windows }} requestApplicationProcess  .\deploy.json
+
+
+
+
+
+
+        name: Main-Workflow
+on:
+  pull_request:
+    branches:
+      - Test
+      - master
+
+jobs:
+  Checkout:
+    uses: ./.github/workflows/checkout.yml
+    secrets: inherit
+
+  AsanaGithubaction:
+    needs: Checkout
+    if: github.event.pull_request.base.ref == 'Test' && github.event.pull_request.head.ref == 'WorkingBranch'
+    runs-on: self-hosted
+    steps:
+      - name: Fetch Asana Task Details
+        id: fetch-task-details
+        env:
+          ASANA_TOKEN: ${{ secrets.ASANA_TOKEN }}
+        run: |
+          # Extract the Asana ticket ID from the working branch name
+          ticket_id=$(echo "${{ github.head_ref }}" | sed -n 's/.*\([0-9]\{5\}\).*$/\1/p')
+          # Use the ticket ID to fetch the task details from Asana (replace `WORKSPACE_ID` with actual workspace ID)
+          task_details=$(curl -s -H "Authorization: Bearer $ASANA_TOKEN" "https://app.asana.com/api/1.0/tasks/${ticket_id}?workspace=WORKSPACE_ID")
+          echo "::set-output name=task-details::${task_details}"
+
+      - name: Check Task Status
+        id: check-task-status
+        run: |
+          # Extract the task status from the task details
+          task_status=$(echo "${{ steps.fetch-task-details.outputs.task-details }}" | jq -r '.data.status.name')
+          if [[ "$task_status" != "Ready for Approval" ]]; then
+            echo "Task is not ready for approval. Exiting workflow."
+            exit 1
+          fi
+
+      - name: Fetch Asana Assignee Email
+        id: fetch-assignee-email
+        run: |
+          # Extract the assignee email from the task details
+          assignee_email=$(echo "${{ steps.fetch-task-details.outputs.task-details }}" | jq -r '.data.assignee.email')
+          echo "::set-output name=assignee-email::${assignee_email}"
+
+      - name: Send Email to Assignee
+        uses: dawidd6/action-outlook-mail@v3
+        with:
+          smtp-server: smtp.office365.com
+          smtp-port: 587
+          to: ${{ steps.fetch-assignee-email.outputs.assignee-email }}
+          subject: Successful deployment notification
+          body: |
+            Dear assignee,
+
+            This is to notify you that the deployment to the TEST environment has been successful.
+
+            Best regards,
+            Your Organization
+
+  DeriveEnvBasedOnPullRequestBase:
+    needs: AsanaGithubaction
+    if: github.event.pull_request.base.ref == 'master' && github.event.pull_request.head.ref == 'WorkingBranch'
+    runs-on: self-hosted
+    steps:
+      - name: Fetch Asana Task Details
+        id: fetch-task-details
+        env:
+          ASANA_TOKEN: ${{ secrets.ASANA_TOKEN }}
+        run: |
+          # Extract the Asana ticket ID from the branch name
+          ticket_id=$(echo "${{ github.head_ref }}" | sed -n 's/.*\([0-9]\{5\}\).*$/\1/p')
+          # Use the ticket ID to fetch the task details from Asana (replace `WORKSPACE_ID` with actual workspace ID)
+          task_details=$(curl -s -H "Authorization: Bearer $ASANA_TOKEN" "https://app.asana.com/api/1.0/tasks/${ticket_id}?workspace=WORKSPACE_ID")
+          echo "::set-output name=task-details::${task_details}"
+
+           - name: Check Task Status
+        id: check-task-status
+        run: |
+          # Extract the task status from the task details
+          task_status=$(echo "${{ steps.fetch-task-details.outputs.task-details }}" | jq -r '.data.status.name')
+          if [[ "$task_status" != "Approved" ]]; then
+            echo "Task is not approved. Exiting workflow."
+            exit 1
+          fi
+
+      - name: Fetch Asana Requester Email
+        id: fetch-requester-email
+        run: |
+          # Extract the requester email from the task details
+          requester_email=$(echo "${{ steps.fetch-task-details.outputs.task-details }}" | jq -r '.data.requester.email')
+          echo "::set-output name=requester-email::${requester_email}"
+
+      - name: Send Email to Requester
+        uses: dawidd6/action-outlook-mail@v3
+        with:
+          smtp-server: smtp.office365.com
+          smtp-port: 587
+          to: ${{ steps.fetch-requester-email.outputs.requester-email }}
+          subject: Successful deployment notification
+          body: |
+            
+		Hello Submitter,
+		
+		Thank you for your previous feedback on the MSR Tools!
+		
+		Your requested update has been completed and is being used by MSRs now! Your contribution has been invaluable to keeping the MSR Tool suite working smoothly, and we really appreciate you.
+		
+		Thank you again and have a great day!
+	
+	 - name: Fetch Asana Assignee Email
+	        id: fetch-assignee-email
+	        run: |
+	          # Extract the assignee email from the task details
+	          assignee_email=$(echo "${{ steps.fetch-task-details.outputs.task-details }}" | jq -r '.data.assignee.email')
+	          echo "::set-output name=assignee-email::${assignee_email}"
+	
+	      - name: Send Email to Assignee
+	        uses: dawidd6/action-outlook-mail@v3
+	        with:
+	          smtp-server: smtp.office365.com
+	          smtp-port: 587
+	          to: ${{ steps.fetch-assignee-email.outputs.assignee-email }}
+	          subject: Successful deployment notification
+	          body: |
+	            Dear assignee,
+	
+	            This is to notify you that the deployment to the Prod environment has been successful.
+	
+	            Best regards,
+	            Your Organization
+	
+		
+PublishUCD:
+    needs: DeployToProd
+    uses: ./.github/workflows/ucd.yml
+    secrets: inherit	
+		
+PublishGitHub:
+    needs: PublishUCD
+    uses: ./.github/workflows/upload.yml
+    secrets: inherit  
+
